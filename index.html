@@ -1,0 +1,1118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>moldoku.ts — workspace</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='3' fill='%23141414'/><path d='M4 5.5h8M4 8h8M4 10.5h5' stroke='%23e8a56b' stroke-width='1.2' stroke-linecap='round'/></svg>">
+<style>
+/* moldoku — minimal editor skin */
+:root{
+  --bg:#0e0e0e;
+  --panel:#131313;
+  --panel2:#171717;
+  --elev:#1c1c1c;
+  --line:#212121;
+  --line2:#2d2d2d;
+  --fg:#dcd9d4;
+  --dim:#6e6b67;
+  --faint:#3a3937;
+  --key:#e8a56b;
+  --key-dim:#8a6440;
+  --key-soft:rgba(232,165,107,.10);
+  --err:#d05a52;
+  --ok:#7fae7a;
+  --blue:#6f9bc4;
+  --cell:34px;
+  --alpha:.2;
+  --term-h:clamp(170px, 36vh, 400px);
+  --kr: "Malgun Gothic", "맑은 고딕", "Apple SD Gothic Neo", "Noto Sans KR", "Pretendard", sans-serif;
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Mono", Menlo, Consolas, "Liberation Mono",
+          "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--bg); color:var(--fg);
+  font:12px/1.5 var(--mono);
+  -webkit-font-smoothing:antialiased;
+  overflow:hidden;
+}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+*{scrollbar-width:thin;scrollbar-color:#292827 transparent}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#292827;border-radius:5px}
+::-webkit-scrollbar-thumb:hover{background:#3a3937}
+.spacer{flex:1}
+
+#app{display:flex;flex-direction:column;height:100vh;overflow:hidden}
+body.resizing{cursor:ns-resize;user-select:none}
+
+/* title bar */
+.titlebar{
+  display:flex;align-items:center;gap:10px;height:30px;flex:none;
+  background:var(--panel);border-bottom:1px solid var(--line);padding:0 10px;
+}
+.dots{display:flex;gap:6px}
+.dots i{width:9px;height:9px;border-radius:50%;background:#2e2e2e}
+.dots i:first-child{background:#3a3230}
+.tb-title{flex:1;text-align:center;color:var(--dim);font-size:11px;letter-spacing:.02em}
+.tb-right{display:flex;gap:8px;min-width:52px;justify-content:flex-end}
+.tb-btn{color:var(--faint);font-size:10px;border:1px solid var(--line);border-radius:4px;padding:1px 5px;cursor:pointer}
+.tb-btn:hover{color:var(--key);border-color:var(--key-dim)}
+
+/* tabs */
+.tabs{display:flex;height:32px;flex:none;background:var(--panel2);border-bottom:1px solid var(--line)}
+.tab{
+  display:flex;align-items:center;gap:7px;padding:0 14px;font-size:11px;color:var(--dim);
+  border-right:1px solid var(--line);background:var(--panel2);white-space:nowrap;
+}
+.tab.active{background:var(--bg);color:var(--fg);box-shadow:inset 0 1px 0 var(--key)}
+.tab .ts{color:var(--blue);font-size:9px}
+.tab .md{color:var(--dim);font-size:9px}
+.tab .x{color:var(--faint);margin-left:2px}
+
+/* body layout */
+.body{flex:1;display:flex;min-height:0}
+
+/* sidebar */
+.sidebar{
+  width:184px;flex:none;background:var(--panel);border-right:1px solid var(--line);
+  display:flex;flex-direction:column;padding:10px 0;overflow:hidden;
+}
+.side-h{
+  font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);
+  padding:6px 14px;
+}
+.tree{list-style:none;font-size:11px}
+.tree li{padding:2.5px 14px 2.5px 22px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tree li.dir{padding-left:12px;color:#57544f}
+.tree li.root{padding-left:12px}
+.tree li.file:hover{color:var(--fg);background:rgba(255,255,255,.02)}
+.tree li.active{color:var(--key);background:var(--key-soft)}
+.tree.small li b{color:var(--dim);font-weight:400}
+#launchFile,#readmeFile{cursor:pointer}
+#launchFile:hover,#readmeFile:hover{color:var(--key)}
+
+/* editor */
+.editor{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg);overflow:auto}
+.breadcrumb{font-size:10.5px;color:var(--faint);padding:7px 18px 4px}
+.breadcrumb i{color:#302f2d;font-style:normal;padding:0 4px}
+.breadcrumb b{color:var(--dim);font-weight:400}
+.code{padding:6px 0 8px}
+.line{display:flex;align-items:center;min-height:20px}
+.ln{
+  width:46px;flex:none;text-align:right;padding-right:16px;
+  color:#333230;font-size:11px;user-select:none;
+}
+.src{color:#54524f;font-size:12px;white-space:pre}
+.src .kw{color:#8b7fa8;font-style:normal}
+.src .str{color:#7a9a6e;font-style:normal}
+.src .typ{color:var(--blue);font-style:normal}
+.src .fn{color:#b5a98f;font-style:normal}
+.src .cm{color:#3d3c3a;font-style:normal}
+.caret{display:inline-block;width:7px;height:14px;background:var(--key);opacity:.7;margin-left:1px;vertical-align:-3px;animation:blink 1.1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+
+/* grid rows live inside code lines */
+.line.grow{min-height:var(--cell)}
+.bk{color:#333230;user-select:none}
+.cells{display:flex}
+.cell{
+  width:var(--cell);height:var(--cell);flex:none;
+  display:flex;align-items:center;justify-content:center;
+  font-size:14.5px;color:var(--dim);position:relative;
+  border-right:1px solid transparent;border-bottom:1px solid transparent;
+  user-select:none;line-height:1;
+}
+.cell.bR{border-right-color:var(--line2)}
+.cell.bB{border-bottom-color:var(--line2)}
+.cell.empty{color:#3a3937;font-size:11px}
+.cell.given{color:#a9a5a0}
+.cell.user{color:var(--key)}
+.cell.hinted{color:var(--key);opacity:.62}
+.cell.wrong{color:var(--err)}
+.cell.peer{background:rgba(255,255,255,.022)}
+.cell.same{background:rgba(232,165,107,.07)}
+.cell:hover{background:rgba(255,255,255,.04)}
+.cell.sel{background:var(--key-soft);box-shadow:inset 0 0 0 1px var(--key-dim)}
+.cell .d{opacity:var(--alpha);transition:opacity .18s}
+.cell .notes{opacity:var(--alpha);transition:opacity .18s;display:grid;grid-template-columns:repeat(3,1fr);width:100%;height:100%;padding:3px;font-size:8px;color:#6a6663;line-height:1}
+.cell .notes span{display:flex;align-items:center;justify-content:center}
+
+/* right panel */
+.right{
+  width:196px;flex:none;background:var(--panel);border-left:1px solid var(--line);
+  display:flex;flex-direction:column;padding:10px 0;overflow:hidden;
+}
+/* run / level picker */
+.levels{display:flex;flex-direction:column;padding:2px 8px 12px;gap:1px}
+.lv{
+  display:flex;align-items:center;gap:9px;padding:7px 7px;border-radius:4px;
+  font-size:11px;letter-spacing:.06em;color:var(--dim);transition:.12s;
+}
+.lv:hover{background:rgba(255,255,255,.04);color:var(--fg)}
+.lv .ic{width:12px;flex:none;font-size:9px;color:var(--faint)}
+.lv .nm{flex:1;text-align:left}
+.lv .v{font-size:10px;color:#3f3e3c;letter-spacing:0}
+.lv:hover .ic{color:var(--key-dim)}
+.lv.on{color:var(--key);background:var(--key-soft)}
+.lv.on .ic{color:var(--key)}
+.lv.on .v{color:var(--key-dim)}
+.lv.ask .nm{color:var(--key)}
+
+.cmds{display:flex;flex-direction:column;padding:2px 8px 10px}
+.cmd{display:flex;align-items:center;gap:9px;padding:5px 6px;border-radius:4px;font-size:11px;color:var(--dim)}
+.cmd:hover{background:rgba(255,255,255,.035);color:var(--fg)}
+.cmd .k{width:22px;color:var(--faint);font-size:10px}
+.cmd .n{flex:1;text-align:left}
+.cmd .v{color:var(--faint);font-size:10px}
+.cmd.on{color:var(--key)}
+.cmd.on .k,.cmd.on .v{color:var(--key)}
+.cmd.off{opacity:.4;pointer-events:none}
+
+.problems{padding:2px 14px;font-size:10.5px;color:var(--faint);overflow:auto}
+.problems .none{color:#393836}
+.problems .p{color:var(--err);padding:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* terminal */
+.terminal{height:var(--term-h);flex:none;background:var(--panel2);border-top:1px solid var(--line);display:flex;flex-direction:column}
+.term-resize{height:7px;flex:none;cursor:ns-resize;position:relative;margin-top:-4px}
+.term-resize::after{
+  content:'';position:absolute;left:50%;top:3px;width:38px;height:2px;margin-left:-19px;
+  border-radius:2px;background:var(--line2);opacity:0;transition:opacity .15s;
+}
+.term-resize:hover::after,body.resizing .term-resize::after{opacity:1;background:var(--key-dim)}
+.term-tabs{display:flex;gap:16px;align-items:center;padding:6px 16px;font-size:9.5px;letter-spacing:.13em;color:var(--faint)}
+.term-tabs .active{color:var(--fg);box-shadow:inset 0 -1px 0 var(--key);padding-bottom:3px}
+.term-tabs .shell{letter-spacing:0;color:#393836}
+.term-body{flex:1;overflow:auto;padding:2px 16px 8px;font-size:11px;line-height:1.65}
+.term-body div{color:#5c5955;white-space:pre-wrap}
+.term-body .t{color:#333230}
+.term-body .ok{color:var(--ok)}
+.term-body .key{color:var(--key)}
+.term-body .err{color:var(--err)}
+
+/* status bar */
+.status{
+  height:24px;flex:none;display:flex;align-items:center;gap:16px;padding:0 12px;
+  background:var(--panel);border-top:1px solid var(--line);font-size:10.5px;color:var(--dim);
+}
+.status .st{display:flex;align-items:center;gap:5px;white-space:nowrap}
+.status .st em{font-style:normal;color:var(--faint)}
+.status .st b{color:var(--fg);font-weight:400}
+.status .dim{color:var(--faint)}
+.status .alpha{gap:7px;color:var(--faint)}
+#alpha{-webkit-appearance:none;appearance:none;width:66px;height:2px;background:var(--line2);border-radius:2px;outline:none;cursor:pointer}
+#alpha::-webkit-slider-thumb{-webkit-appearance:none;width:8px;height:8px;border-radius:50%;background:var(--key)}
+#alpha::-moz-range-thumb{width:8px;height:8px;border:0;border-radius:50%;background:var(--key)}
+
+/* overlays */
+.overlay{
+  position:fixed;inset:0;z-index:60;display:none;
+  align-items:flex-start;justify-content:center;padding-top:14vh;
+  background:rgba(8,8,8,.72);backdrop-filter:blur(2px);
+}
+.overlay.show{display:flex}
+.palette{
+  width:min(430px,90vw);background:var(--elev);border:1px solid var(--line2);border-radius:7px;
+  box-shadow:0 18px 60px rgba(0,0,0,.6);overflow:hidden;
+}
+.pal-h{
+  display:flex;justify-content:space-between;align-items:baseline;
+  padding:11px 15px;font-size:11px;color:var(--fg);border-bottom:1px solid var(--line);
+}
+.pal-h span{font-size:10px;color:var(--faint)}
+.pal-list{list-style:none;padding:5px 0}
+.pal-list li{display:flex;align-items:center;gap:11px;padding:8px 15px;cursor:pointer;font-size:11.5px;color:var(--dim)}
+.pal-list li .ic{color:var(--faint);font-size:10px;width:14px}
+.pal-list li .nm{color:var(--fg);width:74px}
+.pal-list li .ds{flex:1;color:var(--faint);font-size:10px}
+.pal-list li .bs{color:var(--faint);font-size:10px}
+.pal-list li:hover,.pal-list li.hl{background:var(--key-soft)}
+.pal-list li:hover .nm,.pal-list li.hl .nm,.pal-list li:hover .ic,.pal-list li.hl .ic{color:var(--key)}
+.pal-f{display:flex;gap:16px;padding:8px 15px;border-top:1px solid var(--line);font-size:9.5px;color:#393836}
+.res{padding:16px 18px;font-size:11.5px;line-height:1.85;color:var(--dim);white-space:pre-wrap}
+.res b{color:var(--fg);font-weight:400}
+.res .ok{color:var(--ok)}
+.res .err{color:var(--err)}
+.res .key{color:var(--key)}
+/* intro — rendered as a doc comment */
+.codebox{width:min(740px,94vw)}
+.cb-head{display:flex;align-items:center;gap:9px;padding:9px 15px;border-bottom:1px solid var(--line);font-size:11px;color:var(--fg)}
+.cb-head .ts{color:var(--blue);font-size:9px}
+.cb-head .dimr{margin-left:auto;color:#3f3e3c;font-size:10px}
+.cb{padding:13px 0 9px}
+.cl{display:flex;align-items:center;min-height:20px}
+.cln{width:40px;flex:none;text-align:right;padding-right:15px;color:#333230;font-size:10.5px;user-select:none}
+.cs{font-size:11.5px;color:#55534f;white-space:pre;overflow:hidden;text-overflow:ellipsis}
+.cs .tag{color:var(--key)}
+.cs .txt{color:var(--dim);font-family:var(--kr);font-size:12px;letter-spacing:-.01em}
+.pal-btns{display:flex;gap:8px;padding:0 18px 16px}
+.btn{padding:7px 14px;border:1px solid var(--line2);border-radius:5px;font-size:11px;color:var(--dim)}
+.btn:hover{border-color:var(--key-dim);color:var(--key)}
+.btn.primary{background:var(--key);color:#191308;border-color:var(--key)}
+.btn.primary:hover{filter:brightness(1.08);color:#191308}
+
+/* boss / focus mode */
+#boss{position:fixed;inset:0;z-index:90;background:var(--bg);display:none;flex-direction:column}
+#boss.show{display:flex}
+.boss-body{flex:1;overflow:auto;padding:14px 20px;font-size:11.5px;line-height:1.75;color:#5c5955}
+.boss-body div{white-space:pre-wrap}
+.boss-body .ok{color:var(--ok)}
+.boss-body .key{color:var(--key)}
+.boss-body .dimt{color:#333230}
+
+@media (max-width:920px){
+  .sidebar{display:none}
+}
+/* keep the whole file visible without scrolling on shorter screens */
+@media (max-height:880px){
+  :root{--cell:31px;--term-h:clamp(150px, 33vh, 400px)}
+}
+@media (max-height:780px){
+  :root{--cell:28px;--term-h:clamp(140px, 30vh, 400px)}
+}
+@media (max-width:680px){
+  .right{width:150px}
+  :root{--cell:30px}
+  .ln{width:26px;padding-right:8px}
+}
+
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- title bar -->
+  <header class="titlebar">
+    <div class="dots"><i></i><i></i><i></i></div>
+    <div class="tb-title">moldoku.ts — workspace</div>
+    <div class="tb-right">
+      <span class="tb-btn" id="btnMenu" title="run configuration">⌘K</span>
+    </div>
+  </header>
+
+  <!-- tabs -->
+  <nav class="tabs">
+    <div class="tab active"><span class="ts">TS</span>moldoku.ts<span class="x">×</span></div>
+    <div class="tab"><span class="ts">TS</span>solver.ts</div>
+    <div class="tab"><span class="md">MD</span>README.md</div>
+  </nav>
+
+  <main class="body">
+
+    <!-- sidebar -->
+    <aside class="sidebar">
+      <div class="side-h">Explorer</div>
+      <ul class="tree">
+        <li class="dir">▾ src</li>
+        <li class="file active" data-i>moldoku.ts</li>
+        <li class="file">solver.ts</li>
+        <li class="file">constraints.ts</li>
+        <li class="dir">▾ tests</li>
+        <li class="file">moldoku.spec.ts</li>
+        <li class="dir">▸ node_modules</li>
+        <li class="file root">package.json</li>
+        <li class="file root" id="launchFile">launch.json</li>
+        <li class="file root" id="readmeFile">README.md</li>
+      </ul>
+      <div class="side-h" style="margin-top:auto">Timeline</div>
+      <ul class="tree small">
+        <li class="file">index &nbsp;<b id="tlDiff">—</b></li>
+        <li class="file">clues &nbsp;<b id="tlClues">—</b></li>
+        <li class="file">best &nbsp;<b id="tlBest">—</b></li>
+      </ul>
+    </aside>
+
+    <!-- editor -->
+    <section class="editor">
+      <div class="breadcrumb">src <i>›</i> moldoku.ts <i>›</i> <b>grid</b></div>
+      <div class="code" id="code">
+        <div class="line"><span class="ln">1</span><span class="src"><em class="kw">import</em> { Moldoku9, solve } <em class="kw">from</em> <em class="str">'./solver'</em>;</span></div>
+        <div class="line"><span class="ln">2</span><span class="src"></span></div>
+        <div class="line"><span class="ln">3</span><span class="src"><em class="kw">export const</em> <em class="fn">grid</em>: <em class="typ">Moldoku9</em> = [</span></div>
+        <div id="rows"></div>
+        <div class="line"><span class="ln">13</span><span class="src">];</span></div>
+        <div class="line"><span class="ln">14</span><span class="src"></span></div>
+        <div class="line"><span class="ln">15</span><span class="src"><em class="cm">// eslint-disable-next-line no-console</em></span></div>
+        <div class="line"><span class="ln">16</span><span class="src"><em class="fn">console</em>.log(<em class="fn">solve</em>(grid));<span class="caret"></span></span></div>
+      </div>
+    </section>
+
+    <!-- right panel -->
+    <aside class="right">
+      <div class="side-h">Run</div>
+      <div class="levels" id="levels"></div>
+
+      <div class="side-h">Commands</div>
+      <div class="cmds">
+        <button class="cmd" id="cUndo"><span class="k">⌘Z</span><span class="n">undo</span><span class="v" id="undoCount">0</span></button>
+        <button class="cmd" id="cErase"><span class="k">⌫</span><span class="n">delete</span><span class="v"></span></button>
+        <button class="cmd" id="cNote"><span class="k">//</span><span class="n">note</span><span class="v" id="noteState">off</span></button>
+        <button class="cmd" id="cHint"><span class="k">✦</span><span class="n">hint</span><span class="v" id="hintCount">3</span></button>
+      </div>
+
+      <div class="side-h">Problems</div>
+      <div class="problems" id="problems">
+        <div class="none">No problems have been detected.</div>
+      </div>
+    </aside>
+  </main>
+
+  <!-- terminal -->
+  <section class="terminal">
+    <div class="term-resize" id="termResize" title="drag to resize"></div>
+    <div class="term-tabs">
+      <span class="active">TERMINAL</span><span>OUTPUT</span><span>DEBUG CONSOLE</span><span>PORTS</span>
+      <span class="spacer"></span><span class="shell">zsh — moldoku</span>
+    </div>
+    <div class="term-body" id="term"></div>
+  </section>
+
+  <!-- status bar -->
+  <footer class="status">
+    <span class="st"><em>⎇</em> main*</span>
+    <span class="st" id="stTask">no task</span>
+    <span class="spacer"></span>
+    <span class="st" id="stErr">errors <b>0</b>/5</span>
+    <span class="st" id="stCell">Ln 1, Col 1</span>
+    <span class="st alpha">α
+      <input type="range" id="alpha" min="8" max="100" value="20">
+    </span>
+    <span class="st" id="stTime">00:00</span>
+    <span class="st dim">esc: focus</span>
+  </footer>
+</div>
+
+<!-- intro / quick start -->
+<div class="overlay" id="ovIntro">
+  <div class="palette codebox">
+    <div class="cb-head"><span class="ts">MD</span>README.md<span class="dimr">quick start</span></div>
+    <div class="cb">
+      <div class="cl"><span class="cln">1</span><span class="cs">/**</span></div>
+      <div class="cl"><span class="cln">2</span><span class="cs"> *  moldoku — <span class="txt">9×9 상수 행렬 에디터</span></span></div>
+      <div class="cl"><span class="cln">3</span><span class="cs"> *</span></div>
+      <div class="cl"><span class="cln">4</span><span class="cs"> *  <span class="tag">@opacity</span>  <span class="txt">우측 하단 α 슬라이더로 스도쿠의 불투명도를 조정할 수 있습니다</span></span></div>
+      <div class="cl"><span class="cln">5</span><span class="cs"> *  <span class="tag">@resize </span>  <span class="txt">터미널 위쪽 경계를 끌어 로그 창 높이를 바꿀 수 있습니다</span></span></div>
+      <div class="cl"><span class="cln">6</span><span class="cs"> *  <span class="tag">@time   </span>  <span class="txt">난이도 선택 즉시 시간 측정이 시작되며, 다른 창이나 탭으로 넘어가면 알아서 멈춥니다</span></span></div>
+      <div class="cl"><span class="cln">7</span><span class="cs"> *  <span class="tag">@escape </span>  <span class="txt">ESC — 가짜 로그 창으로 전환되고, 시간도 같이 멈춥니다</span></span></div>
+      <div class="cl"><span class="cln">8</span><span class="cs"> *</span></div>
+      <div class="cl"><span class="cln">9</span><span class="cs"> *  <span class="tag">@errors </span>  <span class="txt">오답 5회면 실패</span></span></div>
+      <div class="cl"><span class="cln">10</span><span class="cs"> */</span></div>
+    </div>
+    <div class="pal-btns"><button class="btn primary" id="btnIntro">↵ continue</button></div>
+  </div>
+</div>
+
+<!-- end overlay -->
+<div class="overlay" id="ovEnd">
+  <div class="palette result">
+    <div class="pal-h" id="resHead">Test Results</div>
+    <pre class="res" id="resBody"></pre>
+    <div class="pal-btns">
+      <button class="btn primary" id="btnAgain">re-run</button>
+      <button class="btn" id="btnConfig">dismiss</button>
+    </div>
+  </div>
+</div>
+
+<!-- boss / focus mode -->
+<div id="boss">
+  <div class="titlebar">
+    <div class="dots"><i></i><i></i><i></i></div>
+    <div class="tb-title">zsh — npm run watch</div>
+    <div class="tb-right"></div>
+  </div>
+  <div class="boss-body" id="bossBody"></div>
+</div>
+
+<script>
+/* moldoku — a sudoku that reads as a build log */
+(() => {
+'use strict';
+
+const $  = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+
+/* storage — throws on file:// in Safari, in private mode, or with site data blocked.
+   the game must keep working without it; we just lose records. */
+const LS = {
+  get(k)    { try { return window.localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { window.localStorage.setItem(k, v); } catch (e) {} },
+  del(k)    { try { window.localStorage.removeItem(k); } catch (e) {} },
+};
+
+/* ── configs ─────────────────────────────────────────────── */
+const DIFFS = {
+  easy:    { name: 'EASY',    task: 'dev',       clues: 46 },
+  normal:  { name: 'NORMAL',  task: 'build',     clues: 35 },
+  hard:    { name: 'HARD',    task: 'test:e2e',  clues: 29 },
+  extreme: { name: 'EXTREME', task: 'ci:strict', clues: 24 },
+};
+const MAX_MISTAKES = 5;
+const MAX_HINTS = 3;
+const DEFAULT_DIFF = 'normal';   // auto-started when there is nothing to resume
+
+/* ── generator ───────────────────────────────────────────── */
+const rnd = n => Math.floor(Math.random() * n);
+function shuffled(a) {
+  a = a.slice();
+  for (let i = a.length - 1; i > 0; i--) { const j = rnd(i + 1); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+function ok(b, p, v) {
+  const r = (p / 9) | 0, c = p % 9, br = r - r % 3, bc = c - c % 3;
+  for (let i = 0; i < 9; i++) {
+    if (b[r * 9 + i] === v) return false;
+    if (b[i * 9 + c] === v) return false;
+    if (b[(br + ((i / 3) | 0)) * 9 + bc + i % 3] === v) return false;
+  }
+  return true;
+}
+function makeSolution() {
+  const b = new Int8Array(81);
+  (function fill(p) {
+    if (p === 81) return true;
+    for (const v of shuffled([1, 2, 3, 4, 5, 6, 7, 8, 9])) {
+      if (ok(b, p, v)) { b[p] = v; if (fill(p + 1)) return true; b[p] = 0; }
+    }
+    return false;
+  })(0);
+  return b;
+}
+let _n = 0;
+function _solve(b) {
+  const p = b.indexOf(0);
+  if (p < 0) { _n++; return; }
+  for (let v = 1; v <= 9; v++) {
+    if (ok(b, p, v)) { b[p] = v; _solve(b); b[p] = 0; if (_n > 1) return; }
+  }
+}
+const unique = b => { _n = 0; _solve(Int8Array.from(b)); return _n === 1; };
+
+function makePuzzle(clues) {
+  const sol = makeSolution();
+  const puz = Int8Array.from(sol);
+  let filled = 81;
+  for (const i of shuffled([...Array(81).keys()])) {
+    if (filled <= clues) break;
+    const bak = puz[i];
+    puz[i] = 0;
+    if (unique(puz)) filled--; else puz[i] = bak;
+  }
+  return { sol, puz, clues: filled };
+}
+
+const peerCache = [];
+function peers(i) {
+  if (peerCache[i]) return peerCache[i];
+  const r = (i / 9) | 0, c = i % 9, br = r - r % 3, bc = c - c % 3, s = new Set();
+  for (let k = 0; k < 9; k++) {
+    s.add(r * 9 + k); s.add(k * 9 + c); s.add((br + ((k / 3) | 0)) * 9 + bc + k % 3);
+  }
+  s.delete(i);
+  return (peerCache[i] = [...s]);
+}
+const rowIdx = r => Array.from({ length: 9 }, (_, k) => r * 9 + k);
+const colIdx = c => Array.from({ length: 9 }, (_, k) => k * 9 + c);
+const boxIdx = b => {
+  const br = ((b / 3) | 0) * 3, bc = (b % 3) * 3;
+  return Array.from({ length: 9 }, (_, k) => (br + ((k / 3) | 0)) * 9 + bc + k % 3);
+};
+
+/* ── state ───────────────────────────────────────────────── */
+const S = {
+  diff: 'normal', sol: null, val: null, given: null, notes: null,
+  hinted: null, sel: -1, note: false, hints: MAX_HINTS, mistakes: 0,
+  clues: 0, elapsed: 0, tick: 0, running: false, done: false, undo: [],
+};
+
+/* ── dom ─────────────────────────────────────────────────── */
+const rowsEl = $('#rows'), lvEl = $('#levels'), termEl = $('#term');
+const cells = [];
+
+for (let r = 0; r < 9; r++) {
+  const line = document.createElement('div');
+  line.className = 'line grow';
+  const ln = document.createElement('span');
+  ln.className = 'ln'; ln.textContent = String(r + 4);
+  const open = document.createElement('span');
+  open.className = 'src'; open.innerHTML = '<span class="bk">  [</span>';
+  const wrap = document.createElement('span');
+  wrap.className = 'cells';
+  for (let c = 0; c < 9; c++) {
+    const i = r * 9 + c;
+    const b = document.createElement('button');
+    b.className = 'cell';
+    b.dataset.i = i;
+    b.dataset.base = 'cell' + (c % 3 === 2 && c !== 8 ? ' bR' : '') + (r % 3 === 2 && r !== 8 ? ' bB' : '');
+    wrap.appendChild(b);
+    cells.push(b);
+  }
+  const close = document.createElement('span');
+  close.className = 'src'; close.innerHTML = '<span class="bk">],</span>';
+  line.append(ln, open, wrap, close);
+  rowsEl.appendChild(line);
+}
+
+for (const k in DIFFS) {
+  const b = document.createElement('button');
+  b.className = 'lv'; b.dataset.k = k;
+  b.innerHTML = '<span class="ic">▷</span><span class="nm"></span><span class="v"></span>';
+  lvEl.appendChild(b);
+}
+
+/* ── terminal log ────────────────────────────────────────── */
+const stamp = () => {
+  const d = new Date();
+  return [d.getHours(), d.getMinutes(), d.getSeconds()].map(n => String(n).padStart(2, '0')).join(':');
+};
+function log(text, cls = '') {
+  const d = document.createElement('div');
+  d.innerHTML = '<span class="t">' + stamp() + '</span>  ' +
+    (cls ? '<span class="' + cls + '">' + text + '</span>' : text);
+  termEl.appendChild(d);
+  while (termEl.children.length > 120) termEl.removeChild(termEl.firstChild);
+  termEl.scrollTop = termEl.scrollHeight;
+}
+
+/* ── render ──────────────────────────────────────────────── */
+const fmt = s => String((s / 60) | 0).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+
+function render() {
+  const selV = S.sel >= 0 ? S.val[S.sel] : 0;
+  const sr = S.sel >= 0 ? (S.sel / 9) | 0 : -1, sc = S.sel >= 0 ? S.sel % 9 : -1;
+  const sb = S.sel >= 0 ? ((sr / 3) | 0) * 3 + ((sc / 3) | 0) : -1;
+
+  for (let i = 0; i < 81; i++) {
+    const el = cells[i], v = S.val[i];
+    const r = (i / 9) | 0, c = i % 9, b = ((r / 3) | 0) * 3 + ((c / 3) | 0);
+    let cls = el.dataset.base;
+
+    if (!v) cls += ' empty';
+    else if (S.given[i]) cls += ' given';
+    else if (v !== S.sol[i]) cls += ' wrong';
+    else cls += S.hinted[i] ? ' hinted' : ' user';
+
+    if (S.sel >= 0 && i !== S.sel) {
+      if (r === sr || c === sc || b === sb) cls += ' peer';
+      if (selV && v === selV) cls += ' same';
+    }
+    if (i === S.sel) cls += ' sel';
+    el.className = cls;
+
+    // contents sit in .d / .notes so --alpha dims the digits only:
+    // selection, hover and the clear-flash stay at full strength.
+    if (v) el.innerHTML = '<span class="d">' + v + '</span>';
+    else if (S.notes[i]) {
+      let h = '<span class="notes">';
+      for (let n = 1; n <= 9; n++) h += '<span>' + (S.notes[i] & (1 << (n - 1)) ? n : '') + '</span>';
+      el.innerHTML = h + '</span>';
+    } else el.innerHTML = '<span class="d">·</span>';
+  }
+
+  renderLevels();
+
+  // panels
+  $('#undoCount').textContent = S.undo.length;
+  $('#hintCount').textContent = S.hints;
+  $('#cHint').classList.toggle('off', S.hints <= 0 || S.done);
+  $('#cUndo').classList.toggle('off', !S.undo.length || S.done);
+  $('#noteState').textContent = S.note ? 'on' : 'off';
+  $('#cNote').classList.toggle('on', S.note);
+  $('#stErr').innerHTML = 'errors <b>' + S.mistakes + '</b>/' + MAX_MISTAKES;
+  $('#stCell').textContent = S.sel >= 0 ? 'Ln ' + (((S.sel / 9) | 0) + 4) + ', Col ' + ((S.sel % 9) + 1) : 'Ln 1, Col 1';
+  $('#stTime').textContent = fmt(S.elapsed);
+  $('#stTask').textContent = S.sol ? 'npm run ' + DIFFS[S.diff].task : 'no task';
+  $('#tlDiff').textContent = S.sol ? DIFFS[S.diff].task : '—';
+  $('#tlClues').textContent = S.sol ? S.clues : '—';
+  $('#tlBest').textContent = best(S.diff) ? fmt(best(S.diff)) : '—';
+}
+
+let pendingLv = null, pendingT = 0;
+
+function renderLevels() {
+  $$('.lv', lvEl).forEach(b => {
+    const k = b.dataset.k, live = S.sol && !S.done && S.diff === k;
+    b.className = 'lv' + (live ? ' on' : '') + (pendingLv === k ? ' ask' : '');
+    $('.ic', b).textContent = live ? '▶' : '▷';
+    $('.nm', b).textContent = pendingLv === k ? 'restart?' : DIFFS[k].name;
+    const bt = best(k);
+    $('.v', b).textContent = bt ? fmt(bt) : '--:--';
+  });
+}
+
+function pickLevel(k) {
+  clearTimeout(pendingT);
+  if (S.sol && !S.done && pendingLv !== k) {      // guard an in-progress board
+    pendingLv = k;
+    renderLevels();
+    pendingT = setTimeout(() => { pendingLv = null; renderLevels(); }, 2600);
+    return;
+  }
+  pendingLv = null;
+  start(k);
+}
+
+function renderProblems() {
+  const el = $('#problems');
+  const bad = [];
+  for (let i = 0; i < 81; i++) if (S.val[i] && !S.given[i] && S.val[i] !== S.sol[i]) bad.push(i);
+  if (!bad.length) { el.innerHTML = '<div class="none">No problems have been detected.</div>'; return; }
+  el.innerHTML = bad.map(i =>
+    '<div class="p">✕ moldoku.ts:' + (((i / 9) | 0) + 4) + ':' + ((i % 9) + 1) + ' — constraint</div>'
+  ).join('');
+}
+
+/* ── effects ─────────────────────────────────────────────── */
+function flash(idxs, step = 42) {
+  idxs.forEach((i, k) => {
+    cells[i].animate(
+      [
+        { background: 'rgba(232,165,107,0)', transform: 'scale(1)' },
+        { background: 'rgba(232,165,107,.55)', transform: 'scale(1.16)', offset: .3 },
+        { background: 'rgba(232,165,107,0)', transform: 'scale(1)' },
+      ],
+      { duration: 540, delay: k * step, easing: 'cubic-bezier(.2,.8,.3,1)' }
+    );
+  });
+}
+const unitDone = idxs => idxs.every(i => S.val[i] && S.val[i] === S.sol[i]);
+
+function checkClears(i) {
+  const r = (i / 9) | 0, c = i % 9, b = ((r / 3) | 0) * 3 + ((c / 3) | 0);
+  const hits = [];
+  if (unitDone(rowIdx(r))) hits.push(['row ' + (r + 1), rowIdx(r)]);
+  if (unitDone(colIdx(c))) hits.push(['col ' + (c + 1), colIdx(c)]);
+  if (unitDone(boxIdx(b))) hits.push(['block ' + (b + 1), boxIdx(b)]);
+  hits.forEach(([name, idxs], k) => {
+    setTimeout(() => flash(idxs), k * 120);
+    log('✓ ' + name + ' resolved — ' + (hits.length > 1 ? 'combo x' + hits.length : 'unit cleared'), 'key');
+  });
+}
+
+/* ── game flow ───────────────────────────────────────────── */
+let starting = false;
+function start(diff) {
+  if (starting) return;   // S.sol is only set 30ms later; block a double trigger
+  starting = true;
+  S.diff = diff;
+  log('$ npm run ' + DIFFS[diff].task);
+  log('  generating constraint grid …');
+  hideOverlays();
+  setTimeout(() => {
+    const { sol, puz, clues } = makePuzzle(DIFFS[diff].clues);
+    S.sol = sol;
+    S.val = Int8Array.from(puz);
+    S.given = Array.from(puz, v => !!v);
+    S.notes = new Uint16Array(81);
+    S.hinted = new Array(81).fill(false);
+    S.sel = -1; S.note = false; S.hints = MAX_HINTS; S.mistakes = 0;
+    S.clues = clues; S.elapsed = 0; S.done = false; S.undo = [];
+    startTimer();
+    log('  resolved ' + clues + ' constants, ' + (81 - clues) + ' pending', 'ok');
+    log('  watching for changes…');
+    renderProblems(); render(); save();
+    starting = false;
+  }, 30);
+}
+
+function startTimer() {
+  S.running = true;
+  clearInterval(S.tick);
+  S.tick = setInterval(() => {
+    if (!S.running || S.done) return;
+    S.elapsed++;
+    $('#stTime').textContent = fmt(S.elapsed);
+    if (S.elapsed % 10 === 0) save();
+  }, 1000);
+}
+
+function place(i, v) {
+  if (S.done || !S.sol || S.given[i] || S.hinted[i]) return;
+  const batch = [];
+  const push = j => batch.push({ i: j, val: S.val[j], note: S.notes[j] });
+
+  if (S.note && !S.val[i]) {
+    push(i);
+    S.notes[i] ^= (1 << (v - 1));
+  } else {
+    if (S.val[i] === v) return;
+    push(i);
+    S.val[i] = v;
+    S.notes[i] = 0;
+    if (v === S.sol[i]) {
+      for (const j of peers(i)) {
+        if (!S.val[j] && (S.notes[j] & (1 << (v - 1)))) { push(j); S.notes[j] &= ~(1 << (v - 1)); }
+      }
+    } else {
+      S.mistakes++;
+      log('✕ moldoku.ts:' + (((i / 9) | 0) + 4) + ':' + ((i % 9) + 1) + '  type error: value not assignable  (' + S.mistakes + '/' + MAX_MISTAKES + ')', 'err');
+      cells[i].animate(
+        [{ transform: 'translateX(0)' }, { transform: 'translateX(-3px)' },
+         { transform: 'translateX(3px)' }, { transform: 'translateX(0)' }],
+        { duration: 240 }
+      );
+    }
+  }
+  S.undo.push(batch);
+  renderProblems(); render(); save();
+  if (S.val[i] === S.sol[i]) checkClears(i);
+  if (S.mistakes >= MAX_MISTAKES) return finish(false);
+  checkWin();
+}
+
+function erase(i) {
+  if (S.done || !S.sol || S.given[i] || S.hinted[i]) return;
+  if (!S.val[i] && !S.notes[i]) return;
+  S.undo.push([{ i, val: S.val[i], note: S.notes[i] }]);
+  S.val[i] = 0; S.notes[i] = 0;
+  renderProblems(); render(); save();
+}
+
+function undo() {
+  if (S.done || !S.undo.length) return;
+  for (const c of S.undo.pop()) { S.val[c.i] = c.val; S.notes[c.i] = c.note; }
+  renderProblems(); render(); save();
+}
+
+function hint() {
+  if (S.done || !S.sol || S.hints <= 0) return;
+  let i = S.sel;
+  if (i < 0 || S.val[i] === S.sol[i]) {
+    const empties = [];
+    for (let k = 0; k < 81; k++) if (S.val[k] !== S.sol[k]) empties.push(k);
+    if (!empties.length) return;
+    i = empties[rnd(empties.length)];
+  }
+  S.hints--;
+  S.val[i] = S.sol[i];
+  S.notes[i] = 0;
+  S.hinted[i] = true;
+  for (const j of peers(i)) S.notes[j] &= ~(1 << (S.sol[i] - 1));
+  S.sel = i;
+  log('→ quick fix applied at moldoku.ts:' + (((i / 9) | 0) + 4) + ':' + ((i % 9) + 1) + '  (' + S.hints + ' left)', 'key');
+  flash([i], 0);
+  renderProblems(); render(); save();
+  checkClears(i);
+  checkWin();
+}
+
+function checkWin() {
+  for (let i = 0; i < 81; i++) if (S.val[i] !== S.sol[i]) return;
+  finish(true);
+}
+
+function finish(won) {
+  S.done = true; S.running = false;
+  clearInterval(S.tick);
+  LS.del('moldoku:save');
+
+  if (won) {
+    for (let r = 0; r < 9; r++) setTimeout(() => flash(rowIdx(r), 18), r * 90);
+    const b = best(S.diff);
+    if (!b || S.elapsed < b) {
+      const all = JSON.parse(LS.get('moldoku:best') || '{}');
+      all[S.diff] = S.elapsed;
+      LS.set('moldoku:best', JSON.stringify(all));
+    }
+    log('✓ all 81 constraints satisfied', 'ok');
+    log('  build succeeded in ' + fmt(S.elapsed), 'ok');
+    $('#resHead').innerHTML = 'Test Results<span>' + DIFFS[S.diff].task + '</span>';
+    $('#resBody').innerHTML =
+      '<span class="ok">PASS</span>  src/moldoku.spec.ts\n' +
+      '  <span class="ok">✓</span> satisfies row constraints  <b>(9)</b>\n' +
+      '  <span class="ok">✓</span> satisfies column constraints  <b>(9)</b>\n' +
+      '  <span class="ok">✓</span> satisfies block constraints  <b>(9)</b>\n\n' +
+      'Tests    <b>81 passed</b>, 81 total\n' +
+      'Errors   <b>' + S.mistakes + '</b> / ' + MAX_MISTAKES + '\n' +
+      'Hints    <b>' + (MAX_HINTS - S.hints) + '</b> used\n' +
+      'Time     <span class="key">' + fmt(S.elapsed) + '</span>' +
+      (b && S.elapsed < b ? '   <span class="key">new record</span>' : b ? '   (best ' + fmt(b) + ')' : '   <span class="key">new record</span>');
+  } else {
+    log('✕ build failed — ' + MAX_MISTAKES + ' errors', 'err');
+    $('#resHead').innerHTML = 'Build Failed<span>' + DIFFS[S.diff].task + '</span>';
+    $('#resBody').innerHTML =
+      '<span class="err">FAIL</span>  src/moldoku.spec.ts\n' +
+      '  <span class="err">✕</span> constraint check aborted after <b>' + MAX_MISTAKES + '</b> errors\n\n' +
+      'Filled   <b>' + [...S.val].filter((v, i) => v && v === S.sol[i]).length + '</b> / 81\n' +
+      'Time     <b>' + fmt(S.elapsed) + '</b>\n\n' +
+      '<span class="err">error</span> Command failed with exit code 1.';
+  }
+  render();
+  setTimeout(() => $('#ovEnd').classList.add('show'), won ? 1100 : 500);
+}
+
+/* ── persistence ─────────────────────────────────────────── */
+const best = d => (JSON.parse(LS.get('moldoku:best') || '{}'))[d] || 0;
+
+function save() {
+  if (!S.sol || S.done) return;
+  LS.set('moldoku:save', JSON.stringify({
+    diff: S.diff, sol: [...S.sol].join(''), val: [...S.val].join(''),
+    given: S.given.map(g => (g ? 1 : 0)).join(''),
+    hinted: S.hinted.map(g => (g ? 1 : 0)).join(''),
+    notes: [...S.notes].join(','),
+    hints: S.hints, mistakes: S.mistakes, elapsed: S.elapsed, clues: S.clues,
+  }));
+}
+
+function restore() {
+  const raw = LS.get('moldoku:save');
+  if (!raw) return false;
+  try {
+    const d = JSON.parse(raw);
+    S.diff = d.diff;
+    S.sol = Int8Array.from(d.sol, Number);
+    S.val = Int8Array.from(d.val, Number);
+    S.given = [...d.given].map(c => c === '1');
+    S.hinted = [...d.hinted].map(c => c === '1');
+    S.notes = Uint16Array.from(d.notes.split(',').map(Number));
+    S.hints = d.hints; S.mistakes = d.mistakes; S.elapsed = d.elapsed; S.clues = d.clues;
+    S.sel = -1; S.note = false; S.done = false; S.undo = [];
+    hideOverlays();
+    startTimer();
+    log('$ npm run ' + DIFFS[S.diff].task + ' --watch');
+    log('  restored session from cache (' + fmt(S.elapsed) + ' elapsed)');
+    renderProblems(); render();
+    return true;
+  } catch (e) { return false; }
+}
+
+/* ── overlays ────────────────────────────────────────────── */
+function hideOverlays() {
+  $('#ovIntro').classList.remove('show');
+  $('#ovEnd').classList.remove('show');
+}
+
+/* ── intro ───────────────────────────────────────────────── */
+const introOpen = () => $('#ovIntro').classList.contains('show');
+const showIntro = () => { S.running = false; $('#ovIntro').classList.add('show'); };
+function closeIntro() {
+  if (!introOpen()) return;
+  $('#ovIntro').classList.remove('show');
+  LS.set('moldoku:intro', '1');
+  if (!S.sol) { start(DEFAULT_DIFF); return; }   // first visit: launch the default task
+  if (!S.done && !bossOn) S.running = true;
+}
+
+/* ── terminal resize ─────────────────────────────────────── */
+const TERM_MIN = 84;
+function setTermH(px, persist) {
+  const max = Math.max(TERM_MIN, window.innerHeight - 260);
+  px = Math.round(Math.min(Math.max(px, TERM_MIN), max));
+  document.documentElement.style.setProperty('--term-h', px + 'px');
+  if (persist) LS.set('moldoku:termh', px);
+  return px;
+}
+$('#termResize').addEventListener('pointerdown', e => {
+  e.preventDefault();
+  const y0 = e.clientY, h0 = $('.terminal').offsetHeight;
+  let h = h0;
+  document.body.classList.add('resizing');
+  const move = ev => { h = setTermH(h0 + (y0 - ev.clientY)); };
+  const up = () => {
+    document.body.classList.remove('resizing');
+    setTermH(h, true);
+    window.removeEventListener('pointermove', move);
+    window.removeEventListener('pointerup', up);
+  };
+  window.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', up);
+});
+
+/* ── ambient watcher output ──────────────────────────────── */
+const AMBIENT = [
+  '  ▸ [hmr] update applied — 2 modules',
+  '  ▸ tsc --watch  no issues found',
+  '  ▸ GET /api/moldoku 200 — 12ms',
+  '  ▸ eslint  0 problems (0 errors, 0 warnings)',
+  '  ▸ cache hit ratio 0.94',
+  '  ▸ watching for file changes.',
+  '  ▸ vite: page reload src/solver.ts',
+  '  ▸ prisma: schema in sync with database',
+  '  ▸ jest --watch  24 passed (1.914 s)',
+  '  ▸ bundle 2.1 MB → 480 kB gzip',
+  '  ▸ POST /api/solve 200 — 63ms',
+  '  ▸ git: nothing to commit, working tree clean',
+];
+(function ambient() {
+  setTimeout(() => {
+    if (!bossOn) log(AMBIENT[rnd(AMBIENT.length)]);
+    ambient();
+  }, 6000 + rnd(8000));
+})();
+
+/* ── boss / focus mode ───────────────────────────────────── */
+const BOSS = [
+  ['  ▸ compiling src/moldoku.ts …', 'dimt'],
+  ['  ▸ type-checking 148 files', 'dimt'],
+  ['✔ webpack 5.91.0 compiled successfully in 1284 ms', 'ok'],
+  ['  ▸ [hmr] update applied — 3 modules', 'dimt'],
+  ['  ▸ resolving workspace dependencies', 'dimt'],
+  ['  ▸ eslint  0 problems (0 errors, 0 warnings)', 'dimt'],
+  ['✔ tsc --noEmit  no issues found', 'ok'],
+  ['  ▸ vite dev server ready on http://localhost:5173', 'dimt'],
+  ['  ▸ prisma: schema in sync with database', 'dimt'],
+  ['  ▸ jest: 24 passed, 24 total (2.114 s)', 'dimt'],
+  ['  ▸ GET /api/moldoku 200 — 14ms', 'dimt'],
+  ['  ▸ POST /api/solve 200 — 63ms', 'dimt'],
+  ['  ▸ cache hit ratio 0.94', 'dimt'],
+  ['  ▸ bundling assets … 2.1 MB → 480 kB gzip', 'dimt'],
+  ['  ▸ watching for file changes.', 'dimt'],
+  ['  ▸ rebuilding due to change in src/solver.ts', 'dimt'],
+  ['✔ build finished in 0.87s', 'ok'],
+  ['  ▸ git: nothing to commit, working tree clean', 'dimt'],
+];
+let bossTimer = 0, bossOn = false;
+
+function bossLine() {
+  const [t, c] = BOSS[rnd(BOSS.length)];
+  const d = document.createElement('div');
+  d.className = c;
+  d.textContent = '[' + stamp() + '] ' + t;
+  const b = $('#bossBody');
+  b.appendChild(d);
+  while (b.children.length > 60) b.removeChild(b.firstChild);
+  b.scrollTop = b.scrollHeight;
+  bossTimer = setTimeout(bossLine, 500 + rnd(1400));
+}
+function bossOpen() {
+  if (bossOn) return;
+  bossOn = true;
+  S.running = false;
+  $('#boss').classList.add('show');
+  if (!$('#bossBody').children.length) for (let i = 0; i < 14; i++) {
+    const [t, c] = BOSS[rnd(BOSS.length)];
+    const d = document.createElement('div');
+    d.className = c; d.textContent = '[' + stamp() + '] ' + t;
+    $('#bossBody').appendChild(d);
+  }
+  bossLine();
+}
+function bossClose() {
+  if (!bossOn) return;
+  bossOn = false;
+  clearTimeout(bossTimer);
+  $('#boss').classList.remove('show');
+  if (S.sol && !S.done && !introOpen()) S.running = true;
+}
+
+/* ── input ───────────────────────────────────────────────── */
+rowsEl.addEventListener('click', e => {
+  const c = e.target.closest('.cell');
+  if (!c) return;
+  S.sel = +c.dataset.i;
+  render();
+});
+lvEl.addEventListener('click', e => {
+  const b = e.target.closest('.lv');
+  if (b) pickLevel(b.dataset.k);
+});
+$('#cUndo').onclick = undo;
+$('#cErase').onclick = () => S.sel >= 0 && erase(S.sel);
+$('#cNote').onclick = () => { S.note = !S.note; render(); };
+$('#cHint').onclick = hint;
+$('#btnAgain').onclick = () => start(S.diff);
+$('#btnConfig').onclick = () => { $('#ovEnd').classList.remove('show'); log('  ▸ select a task in the RUN panel'); };
+$('#btnMenu').onclick = () => showIntro();
+$('#launchFile').onclick = () => showIntro();
+$('#btnIntro').onclick = closeIntro;
+$('#ovIntro').onclick = closeIntro;
+$('#readmeFile').onclick = () => showIntro(false);
+
+$('#alpha').addEventListener('input', e => {
+  const v = e.target.value / 100;
+  document.documentElement.style.setProperty('--alpha', v);
+  LS.set('moldoku:alpha', e.target.value);
+});
+
+document.addEventListener('keydown', e => {
+  const k = e.key;
+
+  if (introOpen()) {
+    if (k === 'Enter' || k === 'Escape' || k === ' ') { e.preventDefault(); closeIntro(); }
+    return;
+  }
+  if (k === 'Escape') {
+    e.preventDefault();
+    bossOn ? bossClose() : bossOpen();
+    return;
+  }
+  if (bossOn) return;
+
+  if (!S.sol || S.done) return;
+
+  if ((e.metaKey || e.ctrlKey) && k.toLowerCase() === 'z') { e.preventDefault(); undo(); return; }
+  if (k >= '1' && k <= '9') { if (S.sel >= 0) place(S.sel, +k); return; }
+  if (k === 'Backspace' || k === 'Delete' || k === '0') { if (S.sel >= 0) erase(S.sel); return; }
+  if (k === 'n' || k === 'N') { S.note = !S.note; render(); return; }
+  if (k === 'h' || k === 'H') { hint(); return; }
+
+  if (k.startsWith('Arrow')) {
+    e.preventDefault();
+    if (S.sel < 0) S.sel = 40;
+    else {
+      let r = (S.sel / 9) | 0, c = S.sel % 9;
+      if (k === 'ArrowUp') r = (r + 8) % 9;
+      if (k === 'ArrowDown') r = (r + 1) % 9;
+      if (k === 'ArrowLeft') c = (c + 8) % 9;
+      if (k === 'ArrowRight') c = (c + 1) % 9;
+      S.sel = r * 9 + c;
+    }
+    render();
+  }
+});
+
+window.addEventListener('blur', () => { if (S.sol && !S.done) bossOpen(); });
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && S.sol && !S.done) bossOpen();
+});
+window.addEventListener('beforeunload', save);
+
+/* ── boot ────────────────────────────────────────────────── */
+(function boot() {
+  const a = LS.get('moldoku:alpha');
+  if (a) { $('#alpha').value = a; document.documentElement.style.setProperty('--alpha', a / 100); }
+
+  S.val = new Int8Array(81);
+  S.given = new Array(81).fill(false);
+  S.hinted = new Array(81).fill(false);
+  S.notes = new Uint16Array(81);
+
+  const th = LS.get('moldoku:termh');
+  if (th) setTermH(+th);
+
+  log('$ npm run watch');
+  log('  ▸ workspace: moldoku @ 0.4.1');
+  log('  ▸ node v20.11.1 · pnpm 9.1.0');
+  log('  ▸ loading tsconfig.json, 148 files');
+  log('✔ tsc --noEmit  no issues found', 'ok');
+  log('  ▸ eslint  0 problems (0 errors, 0 warnings)');
+  log('  ▸ dev server ready on http://localhost:5173');
+  log('  ▸ prisma: schema in sync with database');
+  log('✔ webpack 5.91.0 compiled successfully in 1284 ms', 'ok');
+  log('  ▸ waiting for a run configuration…');
+  render();
+
+  const restored = restore();
+  if (!LS.get('moldoku:intro')) showIntro();      // intro first; closing it starts the run
+  else if (!restored) start(DEFAULT_DIFF);
+})();
+
+window.addEventListener('resize', () => {
+  const cur = $('.terminal').offsetHeight;
+  const max = Math.max(TERM_MIN, window.innerHeight - 260);
+  if (cur > max) setTermH(max, true);
+});
+
+})();
+
+</script>
+</body>
+</html>
