@@ -250,15 +250,20 @@ body.resizing{cursor:ns-resize;user-select:none}
 .res .key{color:var(--key)}
 /* intro — rendered as a doc comment */
 .codebox{width:min(740px,94vw)}
-.cb-head{display:flex;align-items:center;gap:9px;padding:9px 15px;border-bottom:1px solid var(--line);font-size:11px;color:var(--fg)}
+.cb-head{display:flex;align-items:stretch;padding:0 15px 0 0;border-bottom:1px solid var(--line);font-size:11px;color:var(--fg)}
+.cb-tab{display:flex;align-items:center;gap:7px;padding:9px 14px;font-size:11px;color:var(--dim);border-right:1px solid var(--line);white-space:nowrap}
+.cb-tab:hover{color:var(--fg)}
+.cb-tab.on{color:var(--fg);background:rgba(255,255,255,.035);box-shadow:inset 0 1px 0 var(--key)}
 .cb-head .ts{color:var(--blue);font-size:9px}
-.cb-head .dimr{margin-left:auto;color:#3f3e3c;font-size:10px}
+.cb-head .dimr{margin-left:auto;align-self:center;color:#3f3e3c;font-size:10px}
 .cb{padding:13px 0 9px}
 .cl{display:flex;align-items:center;min-height:20px}
 .cln{width:40px;flex:none;text-align:right;padding-right:15px;color:#333230;font-size:10.5px;user-select:none}
 .cs{font-size:11.5px;color:#55534f;white-space:pre;overflow:hidden;text-overflow:ellipsis}
 .cs .tag{color:var(--key)}
 .cs .txt{color:var(--dim);font-family:var(--kr);font-size:12px;letter-spacing:-.01em}
+.cs .cb-link{text-decoration:underline;text-decoration-color:var(--line2);text-underline-offset:3px}
+.cs .cb-link:hover{color:var(--key);text-decoration-color:var(--key)}
 .pal-btns{display:flex;gap:8px;padding:0 18px 16px}
 .btn{padding:7px 14px;border:1px solid var(--line2);border-radius:5px;font-size:11px;color:var(--dim)}
 .btn:hover{border-color:var(--key-dim);color:var(--key)}
@@ -400,8 +405,12 @@ body.resizing{cursor:ns-resize;user-select:none}
 <!-- intro / quick start -->
 <div class="overlay" id="ovIntro">
   <div class="palette codebox">
-    <div class="cb-head"><span class="ts">MD</span>README.md<span class="dimr">quick start</span></div>
-    <div class="cb">
+    <div class="cb-head">
+      <button class="cb-tab on" data-lang="en"><span class="ts">MD</span>README.md</button>
+      <button class="cb-tab" data-lang="ko"><span class="ts">MD</span>README.ko.md</button>
+      <span class="dimr">quick start</span>
+    </div>
+    <div class="cb" data-lang="en">
       <div class="cl"><span class="cln">1</span><span class="cs">/**</span></div>
       <div class="cl"><span class="cln">2</span><span class="cs"> *  moldoku — <span class="txt">9×9 constant matrix editor</span></span></div>
       <div class="cl"><span class="cln">3</span><span class="cs"> *</span></div>
@@ -411,7 +420,25 @@ body.resizing{cursor:ns-resize;user-select:none}
       <div class="cl"><span class="cln">7</span><span class="cs"> *  <span class="tag">@escape </span>  <span class="txt">Esc flips to a fake build log and pauses the timer</span></span></div>
       <div class="cl"><span class="cln">8</span><span class="cs"> *</span></div>
       <div class="cl"><span class="cln">9</span><span class="cs"> *  <span class="tag">@errors </span>  <span class="txt">5 wrong entries and the build fails</span></span></div>
-      <div class="cl"><span class="cln">10</span><span class="cs"> */</span></div>
+      <div class="cl"><span class="cln">10</span><span class="cs"> *</span></div>
+      <div class="cl"><span class="cln">11</span><span class="cs"> *  <span class="tag">@author </span>  <span class="txt">dayeon</span></span></div>
+      <div class="cl"><span class="cln">12</span><span class="cs"> *  <span class="tag">@see    </span>  <a class="txt cb-link" href="https://www.linkedin.com/in/1dayeon/" target="_blank" rel="noopener noreferrer">linkedin.com/in/1dayeon</a></span></div>
+      <div class="cl"><span class="cln">13</span><span class="cs"> */</span></div>
+    </div>
+    <div class="cb" data-lang="ko" lang="ko" hidden>
+      <div class="cl"><span class="cln">1</span><span class="cs">/**</span></div>
+      <div class="cl"><span class="cln">2</span><span class="cs"> *  moldoku — <span class="txt">9×9 상수 행렬 에디터</span></span></div>
+      <div class="cl"><span class="cln">3</span><span class="cs"> *</span></div>
+      <div class="cl"><span class="cln">4</span><span class="cs"> *  <span class="tag">@opacity</span>  <span class="txt">우측 하단 α 슬라이더로 스도쿠의 불투명도를 조정할 수 있습니다</span></span></div>
+      <div class="cl"><span class="cln">5</span><span class="cs"> *  <span class="tag">@resize </span>  <span class="txt">터미널 위쪽 경계를 끌어 로그 창 높이를 바꿀 수 있습니다</span></span></div>
+      <div class="cl"><span class="cln">6</span><span class="cs"> *  <span class="tag">@time   </span>  <span class="txt">난이도 선택 즉시 시간 측정이 시작되며, 다른 창이나 탭으로 넘어가면 알아서 멈춥니다</span></span></div>
+      <div class="cl"><span class="cln">7</span><span class="cs"> *  <span class="tag">@escape </span>  <span class="txt">ESC — 가짜 로그 창으로 전환되고, 시간도 같이 멈춥니다</span></span></div>
+      <div class="cl"><span class="cln">8</span><span class="cs"> *</span></div>
+      <div class="cl"><span class="cln">9</span><span class="cs"> *  <span class="tag">@errors </span>  <span class="txt">오답 5회면 실패</span></span></div>
+      <div class="cl"><span class="cln">10</span><span class="cs"> *</span></div>
+      <div class="cl"><span class="cln">11</span><span class="cs"> *  <span class="tag">@author </span>  <span class="txt">dayeon</span></span></div>
+      <div class="cl"><span class="cln">12</span><span class="cs"> *  <span class="tag">@see    </span>  <a class="txt cb-link" href="https://www.linkedin.com/in/1dayeon/" target="_blank" rel="noopener noreferrer">linkedin.com/in/1dayeon</a></span></div>
+      <div class="cl"><span class="cln">13</span><span class="cs"> */</span></div>
     </div>
     <div class="pal-btns"><button class="btn primary" id="btnIntro">↵ continue</button></div>
   </div>
@@ -909,6 +936,24 @@ function closeIntro() {
   if (!S.done && !bossOn) S.running = true;
 }
 
+/* intro language — README.md (en) / README.ko.md (ko). the browser language picks
+   the first tab and a switch is remembered. tab clicks must not reach #ovIntro,
+   whose own click handler closes the intro. */
+function setIntroLang(lang, remember) {
+  if (lang !== 'ko') lang = 'en';
+  $$('#ovIntro .cb-tab').forEach(t => t.classList.toggle('on', t.dataset.lang === lang));
+  $$('#ovIntro .cb[data-lang]').forEach(b => { b.hidden = b.dataset.lang !== lang; });
+  if (remember) LS.set('moldoku:lang', lang);
+}
+const introLang = () => { const t = $('#ovIntro .cb-tab.on'); return t ? t.dataset.lang : 'en'; };
+const browserLang = ((navigator.languages && navigator.languages[0]) || navigator.language || '').toLowerCase();
+setIntroLang(LS.get('moldoku:lang') || (browserLang.startsWith('ko') ? 'ko' : 'en'));
+$$('#ovIntro .cb-tab').forEach(t => {
+  t.onclick = e => { e.stopPropagation(); setIntroLang(t.dataset.lang, true); };
+});
+// the @see link opens a new tab; keep the click from closing the intro
+$$('#ovIntro .cb-link').forEach(a => a.addEventListener('click', e => e.stopPropagation()));
+
 /* ── terminal resize ─────────────────────────────────────── */
 const TERM_MIN = 84;
 function setTermH(px, persist) {
@@ -1044,6 +1089,11 @@ document.addEventListener('keydown', e => {
   const k = e.key;
 
   if (introOpen()) {
+    if (k === 'ArrowLeft' || k === 'ArrowRight' || k === 'Tab') {
+      e.preventDefault();
+      setIntroLang(introLang() === 'en' ? 'ko' : 'en', true);
+      return;
+    }
     if (k === 'Enter' || k === 'Escape' || k === ' ') { e.preventDefault(); closeIntro(); }
     return;
   }
@@ -1111,6 +1161,15 @@ window.addEventListener('beforeunload', save);
   const restored = restore();
   if (!LS.get('moldoku:intro')) showIntro();      // intro first; closing it starts the run
   else if (!restored) start(DEFAULT_DIFF);
+
+  /* credit, for whoever opens devtools. the address is joined at runtime so it
+     never sits in the page source as one scrapeable string. */
+  console.log(
+    '%cmoldoku%c — you found the source.\n%cbuilt by dayeon\n→ linkedin.com/in/1dayeon\n→ ' + ['25dayeon', 'gmail.com'].join('@'),
+    'color:#e8a56b;font-weight:600;font-size:13px',
+    'font-size:13px',
+    'color:#8a8884;line-height:1.7'
+  );
 })();
 
 window.addEventListener('resize', () => {
